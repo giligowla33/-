@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>團體代墊分帳與家庭結算系統</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --accent: #10b981;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; font-family: 'Segoe UI', "Microsoft JhengHei", sans-serif; margin: 0; padding: 0; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; max-width: 1200px; margin: 0 auto; }
+
+    header { text-align: center; padding: 20px 0; margin-bottom: 25px; border-bottom: 2px solid var(--border); }
+    header h1 { font-size: 26px; color: var(--primary); }
+    header p { color: #64748b; font-size: 14px; margin-top: 5px; }
+
+    .grid-container { display: grid; grid-template-columns: 1fr; gap: 25px; }
+    @media (min-width: 900px) {
+      .grid-container { grid-template-columns: 420px 1fr; }
+    }
+
+    .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+    .card h2 { font-size: 18px; color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; }
+
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: bold; font-size: 14px; margin-bottom: 6px; }
+    .form-control { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; outline: none; }
+    .form-control:focus { border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+
+    /* 勾選表單 */
+    .member-select-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .btn-link { background: none; border: none; color: var(--primary-light); font-size: 13px; cursor: pointer; text-decoration: underline; }
+    
+    .member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 220px; overflow-y: auto; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: #f1f5f9; }
+    .member-item { display: flex; align-items: center; gap: 6px; font-size: 13px; background: white; padding: 6px 8px; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer; user-select: none; }
+    .member-item input { cursor: pointer; }
+    .badge-weight { font-size: 10px; padding: 2px 4px; border-radius: 4px; background: #e2e8f0; color: #475569; }
+
+    .btn-submit { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    .btn-submit:hover { background: #1d4ed8; }
+
+    /* 表格 styles */
+    .table-responsive { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { background-color: #f1f5f9; color: var(--primary); font-weight: bold; }
+    tr:hover { background-color: #f8fafc; }
+
+    /* 卡片區塊 */
+    .settlement-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; }
+    .family-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 15px; border-left: 5px solid var(--primary-light); }
+    .family-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 10px; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+    .stat-val { font-weight: bold; }
+    .positive { color: var(--accent); }
+    .negative { color: var(--danger); }
+
+    .badge-net { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge-net.receive { background: #dcfce7; color: #15803d; }
+    .badge-net.pay { background: #fee2e2; color: #b91c1c; }
+
+    .btn-delete { background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>💰 團體代墊分帳與家庭結算系統</h1>
+  <p>支援：個別付款倍數計算 ‧ 家庭付款人統一收費/補繳 ‧ 代墊金額自動抵扣</p>
+</header>
+
+<div class="grid-container">
+  <!-- 左側：新增費用表單 -->
+  <div class="card">
+    <h2>新增代墊項目</h2>
+    <form id="expenseForm">
+      <div class="form-group">
+        <label for="expDate">日期</label>
+        <input type="date" id="expDate" class="form-control" required>
+      </div>
+
+      <div class="form-group">
+        <label for="expItem">品項 / 事由</label>
+        <input type="text" id="expItem" class="form-control" placeholder="例如：營地餐費、包車費" required>
+      </div>
+
+      <div class="form-group">
+        <label for="expAmount">代墊總金額 ($)</label>
+        <input type="number" id="expAmount" class="form-control" min="1" placeholder="例如：3600" required>
+      </div>
+
+      <div class="form-group">
+        <label for="expPayer">代墊人 (誰先付錢)</label>
+        <select id="expPayer" class="form-control" required>
+          <option value="">-- 請選擇代墊人 --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <div class="member-select-header">
+          <label style="margin:0;">使用人 (分擔對象)</label>
+          <div>
+            <button type="button" class="btn-link" onclick="selectAllMembers(true)">全選</button> | 
+            <button type="button" class="btn-link" onclick="selectAllMembers(false)">全清</button>
+          </div>
+        </div>
+        <div class="member-grid" id="memberCheckboxes"></div>
+      </div>
+
+      <button type="submit" class="btn-submit">+ 新增此筆費用</button>
+    </form>
+  </div>
+
+  <!-- 右側：家庭代表結算總表與歷史紀錄 -->
+  <div>
+    <!-- 家庭結算卡片 -->
+    <div class="card" style="margin-bottom: 25px;">
+      <h2>📊 家庭代表最終結算總表 (點對點收費)</h2>
+      <div class="settlement-grid" id="settlementGrid"></div>
+    </div>
+
+    <!-- 明細紀錄表格 -->
+    <div class="card">
+      <h2>📜 代墊費用明細紀錄</h2>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>品項</th>
+              <th>代墊人</th>
+              <th>金額</th>
+              <th>分擔人數</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTableBody">
+            <tr><td colspan="6" style="text-align:center; color:#94a3b8;">尚無記錄，請於左側新增費用</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 1. 成員與家庭付款人完整對照表
+  const members = [
+    { name: "海芙蓉", weight: 1.0, familyPayer: "海芙蓉" },
+    { name: "青竹絲", weight: 1.0, familyPayer: "海芙蓉" },
+    { name: "蜜袋鼯", weight: 1.0, familyPayer: "海芙蓉" },
+    { name: "非洲獅", weight: 0.5, familyPayer: "海芙蓉" },
+
+    { name: "寄居蟹", weight: 1.0, familyPayer: "寄居蟹" },
+    { name: "椰子蟹", weight: 1.0, familyPayer: "寄居蟹" },
+    { name: "鯨鯊",   weight: 1.0, familyPayer: "寄居蟹" },
+    { name: "粉紅兔", weight: 0.5, familyPayer: "寄居蟹" },
+
+    { name: "夜梟",   weight: 1.0, familyPayer: "夜梟" },
+    { name: "雞蛋",   weight: 1.0, familyPayer: "夜梟" },
+    { name: "奇異果", weight: 0.5, familyPayer: "夜梟" },
+
+    { name: "棉花",   weight: 1.0, familyPayer: "棉花" },
+    { name: "小羊",   weight: 0.5, familyPayer: "棉花" },
+
+    { name: "幸運草", weight: 1.0, familyPayer: "幸運草" },
+    { name: "獵豹",   weight: 1.0, familyPayer: "幸運草" },
+    { name: "蝸牛",   weight: 0.5, familyPayer: "幸運草" }
+  ];
+
+  const familyPayers = ["海芙蓉", "寄居蟹", "夜梟", "棉花", "幸運草"];
+  let records = [];
+
+  window.onload = function() {
+    document.getElementById("expDate").valueAsDate = new Date();
+
+    // 下拉選單：代墊人
+    const payerSelect = document.getElementById("expPayer");
+    members.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m.name;
+      opt.textContent = `${m.name} (代表:${m.familyPayer})`;
+      payerSelect.appendChild(opt);
+    });
+
+    // 勾選框：使用人
+    const cbContainer = document.getElementById("memberCheckboxes");
+    members.forEach(m => {
+      const div = document.createElement("label");
+      div.className = "member-item";
+      div.innerHTML = `
+        <input type="checkbox" class="member-cb" value="${m.name}" checked>
+        <span>${m.name}</span>
+        <span class="badge-weight">${m.weight}倍</span>
+      `;
+      cbContainer.appendChild(div);
+    });
+
+    renderAll();
+  };
+
+  function selectAllMembers(status) {
+    document.querySelectorAll(".member-cb").forEach(cb => cb.checked = status);
+  }
+
+  // 表單送出
+  document.getElementById("expenseForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const date = document.getElementById("expDate").value;
+    const item = document.getElementById("expItem").value.trim();
+    const amount = parseFloat(document.getElementById("expAmount").value);
+    const payer = document.getElementById("expPayer").value;
+
+    const selectedUsers = [];
+    document.querySelectorAll(".member-cb:checked").forEach(cb => {
+      selectedUsers.push(cb.value);
+    });
+
+    if (selectedUsers.length === 0) {
+      alert("請至少勾選一位使用人！");
+      return;
+    }
+
+    records.push({ id: Date.now(), date, item, amount, payer, users: selectedUsers });
+
+    document.getElementById("expItem").value = "";
+    document.getElementById("expAmount").value = "";
+    selectAllMembers(true);
+
+    renderAll();
+  });
+
+  function deleteRecord(id) {
+    if (confirm("確定要刪除這筆紀錄嗎？")) {
+      records = records.filter(r => r.id !== id);
+      renderAll();
+    }
+  }
+
+  function renderAll() {
+    renderRecordsTable();
+    renderSettlement();
+  }
+
+  function renderRecordsTable() {
+    const tbody = document.getElementById("recordsTableBody");
+    tbody.innerHTML = "";
+
+    if (records.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#94a3b8;">尚無記錄，請於左側新增費用</td></tr>`;
+      return;
+    }
+
+    records.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.date}</td>
+        <td><strong>${r.item}</strong></td>
+        <td><span style="color:#1e3a8a; font-weight:bold;">${r.payer}</span></td>
+        <td>$${r.amount.toLocaleString()}</td>
+        <td>${r.users.length} 人</td>
+        <td><button class="btn-delete" onclick="deleteRecord(${r.id})">刪除</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderSettlement() {
+    const memberStats = {};
+    members.forEach(m => {
+      memberStats[m.name] = { totalExpense: 0, totalAdvanced: 0, weight: m.weight, familyPayer: m.familyPayer };
+    });
+
+    // 計算每筆明細
+    records.forEach(r => {
+      if (memberStats[r.payer]) {
+        memberStats[r.payer].totalAdvanced += r.amount;
+      }
+
+      let currentTotalWeight = 0;
+      r.users.forEach(uName => {
+        if (memberStats[uName]) {
+          currentTotalWeight += memberStats[uName].weight;
+        }
+      });
+
+      if (currentTotalWeight > 0) {
+        const costPerUnitWeight = r.amount / currentTotalWeight;
+        r.users.forEach(uName => {
+          if (memberStats[uName]) {
+            memberStats[uName].totalExpense += costPerUnitWeight * memberStats[uName].weight;
+          }
+        });
+      }
+    });
+
+    // 歸戶至家庭付款人
+    const familyStats = {};
+    familyPayers.forEach(fp => {
+      familyStats[fp] = { familyPayer: fp, totalAdvanced: 0, totalExpense: 0 };
+    });
+
+    members.forEach(m => {
+      const fp = m.familyPayer;
+      if (familyStats[fp]) {
+        familyStats[fp].totalAdvanced += memberStats[m.name].totalAdvanced;
+        familyStats[fp].totalExpense += memberStats[m.name].totalExpense;
+      }
+    });
+
+    // 渲染結算卡片
+    const container = document.getElementById("settlementGrid");
+    container.innerHTML = "";
+
+    familyPayers.forEach(fp => {
+      const stat = familyStats[fp];
+      const net = stat.totalAdvanced - stat.totalExpense;
+
+      let statusBadge = "";
+      if (Math.abs(net) < 0.01) {
+        statusBadge = `<span class="badge-net" style="background:#f1f5f9; color:#475569;">已結清 $0</span>`;
+      } else if (net > 0) {
+        statusBadge = `<span class="badge-net receive">應收取 $${Math.round(net).toLocaleString()}</span>`;
+      } else {
+        statusBadge = `<span class="badge-net pay">應支付 $${Math.abs(Math.round(net)).toLocaleString()}</span>`;
+      }
+
+      const card = document.createElement("div");
+      card.className = "family-card";
+      card.innerHTML = `
+        <div class="family-header">
+          <span>家庭代表：${fp}</span>
+          ${statusBadge}
+        </div>
+        <div class="stat-row">
+          <span>家庭總代墊金額：</span>
+          <span class="stat-val">$${Math.round(stat.totalAdvanced).toLocaleString()}</span>
+        </div>
+        <div class="stat-row">
+          <span>家庭應分擔總額：</span>
+          <span class="stat-val">$${Math.round(stat.totalExpense).toLocaleString()}</span>
+        </div>
+        <div class="stat-row" style="margin-top:10px; font-weight:bold; border-top:1px dashed #cbd5e1; padding-top:6px;">
+          <span>最終結算：</span>
+          <span class="stat-val ${net >= 0 ? 'positive' : 'negative'}">
+            ${net >= 0 ? '+' : '-'}$${Math.abs(Math.round(net)).toLocaleString()}
+          </span>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+</script>
+</body>
+</html>
